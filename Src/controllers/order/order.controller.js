@@ -1,74 +1,101 @@
-import jwt from "jsonwebtoken";
 import mongoose from "mongoose";
-
-import { UsersModel } from "../../models/users/users.model.js";
-import { AdminsModel } from "../../models/admin/admin.model.js";
+import TelegramBot from "node-telegram-bot-api";
 import { OrdersModel } from "../../models/orders/orders.model.js"
 import { productsModel } from "../../models/products/products.model.js";
 
+const BOT_TOKEN = process.env.BOT_TOKEN;
+const bot = new TelegramBot(BOT_TOKEN, { polling: true })
+
 export default {
     async create(req, res) {
+        const session = await mongoose.startSession();
         try {
-            const session = await mongoose.startSession();
+            if (req.admin) {
+                return res.status(403).json({ msg: "You cannot perform this action", status: 403 });
+            }
+
             let { productId, paid, paymentMethodOnline, productQuantity, location } = req.body;
-
-            const SECRET_KEY = process.env.SECRET_KEY;
-
-            const tokenHeader = req.headers['authorization'];
-            const token = tokenHeader.split(' ')[1];
-            const payload = jwt.verify(token, SECRET_KEY)
-
             session.startTransaction();
 
-            let productData = await productsModel.findOne({ _id: productId })
+            // Mahsulotni qidirish
+            const productData = await productsModel.findOne({
+                "variants._id": productId // `variants` ichidagi `_id`ni qidirish
+            });
 
             if (!productData) {
                 await session.abortTransaction();
                 session.endSession();
-                return res.status(404).json({ msg: "Product not found", status: 404 })
+                return res.status(404).json({ msg: "Product not found", status: 404 });
             }
 
-            if (productQuantity > productData.stockQuantity) {
+            // Variantni topish
+            const variant = productData.variants.find(v => v._id.toString() === productId);
+
+            // Agar variant topilmasa
+            if (!variant) {
+                await session.abortTransaction();
+                session.endSession();
+                return res.status(404).json({ msg: "Variant not found", status: 404 });
+            }
+
+            // Omber miqdorini tekshirish
+            if (productQuantity > variant.stockQuantity) {
                 await session.abortTransaction();
                 session.endSession();
                 return res.status(400).json({
-                    "status": 400,
-                    "error": "Insufficient stock",
-                    "requested_quantity": productQuantity,
-                    "available_quantity": productData.productQuantity
-                })
+                    status: 400,
+                    error: "Insufficient stock",
+                    requested_quantity: productQuantity,
+                    available_quantity: variant.stockQuantity
+                });
             }
 
-            const sellingPrice = productData.price * productQuantity;
+            // Sotish narxini hisoblash
+            const sellingPrice = variant.price * productQuantity;
 
-            let createdData = await OrdersModel.create({ productId, paid, paymentMethodOnline, sellingPrice, productQuantity, location, userId: payload.id })
+            // Yangi buyurtma yaratish
+            let createdData = await OrdersModel.create({
+                productId,
+                paid,
+                paymentMethodOnline,
+                sellingPrice,
+                productQuantity,
+                location,
+                userId: req.user._id
+            });
 
+            // Variantning stock miqdorini kamaytirish
             await productsModel.updateOne(
-                { _id: productId },
-                { $inc: { stockQuantity: -productQuantity, numberOfSales: 1 } }
+                { _id: productData._id, "variants._id": productId },
+                {
+                    $inc: { "variants.$.stockQuantity": -productQuantity }, // Variantning stock miqdorini kamaytirish
+                    $inc: { numberOfSales: 1 } // Umumiy sotish sonini oshirish
+                }
             );
 
+            // Chatga xabar yuborish
+            const message = "Siteda sizga buyurtma bor";
+            const chatId = "1390138455";
+            await bot.sendMessage(chatId, message);
+
+            // Tranzaksiyani tasdiqlash
             await session.commitTransaction();
             session.endSession();
 
+            // Javob qaytarish
             res.status(201).json({ createdData, status: 201 });
+
         } catch (error) {
-            console.log(error)
+            console.log(error);
             await session.abortTransaction();
             session.endSession();
+            res.status(500).json({ msg: "Server error", error: error.message });
         }
     },
 
     async orderFindById(req, res) {
         try {
             let { id } = req.params;
-
-            const SECRET_KEY = process.env.SECRET_KEY;
-
-            // Tokenni olish va foydalanuvchi ma'lumotlarini tekshirish
-            const tokenHeader = req.headers['authorization'];
-            const token = tokenHeader.split(' ')[1];
-            const payload = jwt.verify(token, SECRET_KEY);
 
             // Orderni olish
             let orderData = await OrdersModel.findOne({ _id: id }).populate("userId", "-password -interests");
@@ -77,12 +104,8 @@ export default {
                 return res.status(404).json({ msg: "Order not found", status: 404 });
             }
 
-            // Admin yoki foydalanuvchi tekshirish
-            let adminData = await AdminsModel.findOne({ _id: payload.id });
-            let usersData = await UsersModel.findOne({ _id: payload.id });
-
             // Agar admin bo'lmasa va orderni yaratuvchi foydalanuvchi bo'lmasa, xato xabarini qaytarish
-            if (!adminData && usersData._id.toString() !== orderData.userId._id.toString()) {
+            if (!req.admin && req.user._id.toString() !== orderData.userId._id.toString()) {
                 return res.status(403).json({ msg: "Forbidden: You do not have permission to view this order", status: 403 });
             }
 
@@ -175,10 +198,9 @@ export default {
 
     async getMyOrders(req, res) {
         try {
-            const SECRET_KEY = process.env.SECRET_KEY;
-            const tokenHeader = req.headers['authorization'];
-            const token = tokenHeader.split(' ')[1];
-            const payload = jwt.verify(token, SECRET_KEY);
+            if (req.admin) {
+                return res.status(404).json({ msg: "dont have your orders", status: 404 })
+            }
 
             // Extract the page and limit parameters from the query string
             const page = parseInt(req.query.page) || 1;  // Default to page 1 if no page is provided
@@ -188,12 +210,12 @@ export default {
             const skip = (page - 1) * limit;
 
             // Fetch the orders with pagination
-            const myOrders = await OrdersModel.find({ userId: payload.id })
+            const myOrders = await OrdersModel.find({ userId: req.user._id })
                 .skip(skip)
                 .limit(limit);
 
             // Get the total number of orders for pagination info
-            const totalOrders = await OrdersModel.countDocuments({ userId: payload.id });
+            const totalOrders = await OrdersModel.countDocuments({ userId: req.user._id });
 
             // If no orders found, return a 404
             if (myOrders.length === 0) {

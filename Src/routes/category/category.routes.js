@@ -1,8 +1,8 @@
 import { Router } from "express";
 import { uploadCategory } from "../../utils/category.multer.js";
+import { checkAdminToken } from "../../tokens/admin_token/admin.token.js";
 import { validateName } from "../../middlewares/check_name/name.middleware.js";
 import categoryController from "../../controllers/category/category.controller.js";
-import { checkAdminToken } from "../../tokens/admin_token/admin.token.js";
 
 /**
  * @swagger
@@ -16,7 +16,7 @@ import { checkAdminToken } from "../../tokens/admin_token/admin.token.js";
  * /category/create:
  *   post:
  *     summary: Create a new category
- *     tags: [Categories]
+ *     tags: [Categories] 
  *     description: Creates a new category in the system
  *     requestBody:
  *       required: true
@@ -37,13 +37,8 @@ import { checkAdminToken } from "../../tokens/admin_token/admin.token.js";
  */
 export const category_router = Router();
 
-category_router.post(
-  "/create",
-  checkAdminToken,
-  uploadCategory.single("category_img"),
-  validateName,
-  categoryController.createCategory
-);
+
+category_router.post("/create", checkAdminToken, uploadCategory.single("category_img"), validateName, categoryController.createCategory);
 
 /**
  * @swagger
@@ -71,6 +66,7 @@ category_router.get("/get/all", categoryController.getAllCategory);
  */
 
 category_router.get("/get/popular", categoryController.getTopCategories);
+
 
 /**
  * @swagger
@@ -122,11 +118,4 @@ category_router.get("/get/by/query", categoryController.getByQuery);
  *       200:
  *         description: Category updated successfully
  */
-category_router.patch(
-  "/update/:id",
-  checkAdminToken,
-  validateName,
-  categoryController.updateCategory
-);
-
-category_router.get("/get/by/:id", categoryController.getCategoryById);
+category_router.patch("/update/:id", checkAdminToken, validateName, categoryController.updateCategory);

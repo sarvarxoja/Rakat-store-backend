@@ -1,4 +1,3 @@
-import jwt from "jsonwebtoken";
 import moment from "moment-timezone";
 import { korzinkaModel } from "../../models/korzinka/korzinka.model.js";
 import { productsModel } from "../../models/products/products.model.js";
@@ -6,12 +5,11 @@ import { productsModel } from "../../models/products/products.model.js";
 export default {
     async create(req, res) {
         try {
-            const SECRET_KEY = process.env.SECRET_KEY;
-            const tokenHeader = req.headers['authorization'];
-            const token = tokenHeader.split(' ')[1];
-            const payload = jwt.verify(token, SECRET_KEY)
+            if (req.admin) {
+                return res.status(404).json({ msg: "dont have your orders", status: 404 })
+            }
 
-            let checkKorzinka = await korzinkaModel.findOne({ userId: payload.id })
+            let checkKorzinka = await korzinkaModel.findOne({ userId: req.user._id })
 
             if (checkKorzinka) {
                 return res.status(400).json({ msg: "already your cart", status: 400 })
@@ -31,13 +29,12 @@ export default {
         try {
             let { products } = req.body;  // Bodydan kirgan mahsulotlar
 
-            const SECRET_KEY = process.env.SECRET_KEY;
-            const tokenHeader = req.headers['authorization'];
-            const token = tokenHeader.split(' ')[1]; // Tokenni olish
-            const payload = jwt.verify(token, SECRET_KEY);  // Tokenni tekshirish
+            if (req.admin) {
+                return res.status(404).json({ msg: "dont have your orders", status: 404 })
+            }
 
             // Foydalanuvchi uchun korzinka mavjudligini tekshirish
-            const cart = await korzinkaModel.findOne({ userId: payload.id });
+            const cart = await korzinkaModel.findOne({ userId: req.user._id });
 
             if (!cart) {
                 return res.status(404).json({ msg: 'Cart not found', status: 404 });
@@ -97,14 +94,12 @@ export default {
 
     async getKorzinkaData(req, res) {
         try {
-            // JWT tokenni tekshirish
-            const SECRET_KEY = process.env.SECRET_KEY;
-            const tokenHeader = req.headers['authorization'];
-            const token = tokenHeader.split(' ')[1];
-            const payload = jwt.verify(token, SECRET_KEY);
-
+            if (req.admin) {
+                return res.status(404).json({ msg: "dont have your orders", status: 404 })
+            }
+            
             // Korzinka ma'lumotlarini topish
-            let carts = await korzinkaModel.find({ userId: payload.id })
+            let carts = await korzinkaModel.find({ userId: req.user._id })
                 .populate('products.productId') // Mahsulotni populate qilish
                 .sort({ createdAt: -1 }); // Yangi korzinkalarni birinchi qilib chiqarish
 
@@ -136,17 +131,13 @@ export default {
     async removeProduct(req, res) {
         try {
             const { id } = req.params; // This could be the _id of the product in the cart.
-            const SECRET_KEY = process.env.SECRET_KEY;
 
-            // Get the token from the Authorization header
-            const tokenHeader = req.headers['authorization'];
-            const token = tokenHeader.split(' ')[1];
-
-            // Verify the token
-            const payload = jwt.verify(token, SECRET_KEY);
-
+            if (req.admin) {
+                return res.status(404).json({ msg: "dont have your orders", status: 404 })
+            }
+            
             // Find the user's cart
-            const cart = await korzinkaModel.findOne({ userId: payload.id });
+            const cart = await korzinkaModel.findOne({ userId: req.user._id });
 
             if (!cart) {
                 return res.status(404).json({ message: "Cart not found" });

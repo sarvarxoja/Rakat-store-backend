@@ -1,22 +1,32 @@
 export const validateProductCreate = (req, res, next) => {
     try {
-        let { name, short_description, description, stock_quantity, price, discount, sale_status, tags, category, color } = req.body;
+        let { name, short_description, description, stock_quantity, price, discount, sale_status, category, color } = req.body;
 
-        if (!name || !short_description || !description || !stock_quantity || !price || !discount || !sale_status  || !category || !color) {
+        if (!name || !short_description || !description || !stock_quantity || !price || !discount || !sale_status || !color) {
             return res.status(400).json({
                 msg: "Information must be entered in full", status: 400
             })
         }
 
+        if (sale_status === 'true') {
+            sale_status = true;
+        } else if (sale_status === 'false') {
+            sale_status = false;
+        }
+
+        stock_quantity = Number(stock_quantity);
+        price = Number(price);
+        discount = Number(discount);
+
         if (name.length > 50 || name.length < 3) {
-            return res.staus(400).json({
+            return res.status(400).json({
                 msg: "name must be greater than 3 and less than 50 in length, NON KABOB N1",
                 status: 400
             })
         }
 
         if (color.length > 50 || color.length < 1) {
-            return res.staus(400).json({
+            return res.status(400).json({
                 msg: "color must be greater than 1 and less than 50 in length",
                 status: 400
             })
@@ -30,22 +40,23 @@ export const validateProductCreate = (req, res, next) => {
             return res.status(400).json({ msg: "description must be greater than 300 and less than 2000 in length" })
         }
 
-        if (typeof stock_quantity !== 'number') {
-            return res.status(400).json({ msg: "must be stock_quantity number" })
+        if (isNaN(stock_quantity)) {
+            return res.status(400).json({ msg: "stock_quantity must be a number" })
         }
 
-        if (typeof price !== 'number') {
-            return res.status(400).json({ msg: "must be price number" })
+        if (isNaN(price)) {
+            return res.status(400).json({ msg: "price must be a number" })
         }
 
-        if (typeof discount !== 'number') {
-            return res.status(400).json({ msg: "must be discount number" })
+        if (isNaN(discount)) {
+            return res.status(400).json({ msg: "discount must be a number" })
         }
 
         if (typeof sale_status !== 'boolean') {
-            return res.status(400).json({ msg: "must be sale_status number" })
+            return res.status(400).json({ msg: "sale_status must be a boolean" })
         }
 
+        req.admin
         next()
     } catch (error) {
         console.log(error)

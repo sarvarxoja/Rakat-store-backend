@@ -3,7 +3,8 @@ import mongoose, { Schema } from "mongoose";
 const Orders = new Schema({
     productId: {
         type: Schema.ObjectId,
-        required: true
+        required: true,
+        ref: "products.variants"
     },
 
     paid: {

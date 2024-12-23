@@ -1,6 +1,8 @@
 import { Router } from "express";
 import tagsController from "../../controllers/tags/tags.controller.js";
+import { checkAdminToken } from "../../tokens/admin_token/admin.token.js";
 import { validateName } from "../../middlewares/check_name/name.middleware.js";
+import { checkUserToken } from "../../tokens/user_token/user.token.js";
 
 export const tags_router = Router()
 
@@ -32,7 +34,7 @@ export const tags_router = Router()
  *       201:
  *         description: Tag muvaffaqiyatli yaratildi
  */
-tags_router.post("/create", validateName, tagsController.createTag);
+tags_router.post("/create", checkAdminToken, validateName, tagsController.createTag);
 
 /**
  * @swagger
@@ -60,7 +62,7 @@ tags_router.post("/create", validateName, tagsController.createTag);
  *       200:
  *         description: Taglar muvaffaqiyatli qaytarildi
  */
-tags_router.get("/get/all", tagsController.getAllTags);
+tags_router.get("/get/all", checkUserToken,tagsController.getAllTags);
 
 /**
  * @swagger
@@ -81,7 +83,7 @@ tags_router.get("/get/all", tagsController.getAllTags);
  *       200:
  *         description: Qidirish muvaffaqiyatli
  */
-tags_router.get("/get/by/query", tagsController.getByQuery);
+tags_router.get("/get/by/query", checkUserToken ,tagsController.getByQuery);
 
 /**
  * @swagger
@@ -114,4 +116,4 @@ tags_router.get("/get/by/query", tagsController.getByQuery);
  *       404:
  *         description: Tag topilmadi
  */
-tags_router.patch("/update/:id", validateName, tagsController.updateTag);
+tags_router.patch("/update/:id", checkAdminToken,validateName, tagsController.updateTag);

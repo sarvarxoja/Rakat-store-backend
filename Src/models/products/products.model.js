@@ -1,5 +1,6 @@
 import mongoose, { Schema } from "mongoose";
 
+// Mahsulotlar modelini yaratish
 const products = new Schema({
     name: {
         type: String,
@@ -22,114 +23,64 @@ const products = new Schema({
         maxLength: 2000
     },
 
-    stockQuantity: {
-        type: Number,
-        required: true,
-    },
+    // Variants bo'limi qo'shildi
+    variants: [
+        {
+            color: { type: String, required: true },
+            price: { type: Number, required: true },
+            discount: { type: Number, default: 0 }, // Variantga tegishli chegirma
+            saleStatus: { type: Boolean, required: true },
+            productImages: { type: [String], required: true }, // Rasm variantlarga oid
+            stockQuantity: { type: Number, required: true }, // Variantning mavjudligi
+        }
+    ],
 
-    price: {
-        type: Number,
-        required: true
-    },
-
-    discount: {
-        type: Number,
-        default: 0,
-    },
-
-    saleStatus: {
-        type: Boolean,
-        required: true
-    },
+    mainImg: { type: String, required: true },
 
     tags: [
         {
-            type: Schema.ObjectId, // ObjectId типи
-            ref: 'Tags', // 'Tag' моделига ишора
+            type: Schema.ObjectId, // ObjectId tipi
+            ref: 'Tags', // 'Tag' modeliga ishora
         }
     ],
 
     category: [
         {
-            type: Schema.ObjectId, // ObjectId типи
-            ref: 'Categories', // 'Tag' моделига ишора
+            type: Schema.ObjectId, // ObjectId tipi
+            ref: 'Categories', // 'Category' modeliga ishora
             required: true
         }
     ],
 
-    mainImg: {
-        type: String,
-        required: true
-    },
+    metaTitle: { type: String, default: null },
+    metaDescription: { type: String, default: null },
 
-    productImages: {
-        type: [String],
-        required: true,
-    },
-
-    metaTitle: {
-        type: String,
-        default: null
-    },
-
-    metaDescription: {
-        type: String,
-        default: null
-    },
-
-    metaImage: {
-        type: String,
-        default: null
-    },
-
-    popularity: {
-        type: Number,
-        default: 0
-    },
-
-    color: {
-        type: String,
-        default: null
-    },
+    popularity: { type: Number, default: 0 },
 
     views: [
         {
-            type: Schema.ObjectId, // ObjectId типи
-            ref: 'Users', // 'Tag' моделига ишора
+            type: Schema.ObjectId, // ObjectId tipi
+            ref: 'Users', // 'User' modeliga ishora
         }
     ],
 
-    viewsCount: {
-        type: Number,
-        default: 0
-    },
+    viewsCount: { type: Number, default: 0 },
 
+    numberOfSales: { type: Number, default: 0 },
 
-    numberOfSales: {
-        type: Number,
-        default: 0
-    },
+    userId: { type: Schema.ObjectId, ref: "Users", required: true },
 
-    userId: {
-        type: Schema.ObjectId,
-        ref: "Users",
-        required: true
-    },
+    createdAt: { type: Date, default: Date.now },
+});
 
-    createdAt: {
-        type: Date,
-        default: Date.now
-    },
-})
-
-products.virtual('discountedPrice').get(function () {
-    if (this.discount && this.price) {
-        return this.price * (1 - this.discount / 100); // 10% chegirma misol uchun
-    }
-    return this.price; // Discount yo'q bo'lsa, asl narxni qaytaradi
+products.virtual('variantsDiscounted').get(function () {
+    return this.variants.map(variant => {
+        const discountedPrice = variant.price * (1 - (variant.discount / 100));
+        return { ...variant.toObject(), discountedPrice };
+    });
 });
 
 products.set('toJSON', { virtuals: true });
 products.set('toObject', { virtuals: true });
 
-export const productsModel = mongoose.model("products", products)
+export const productsModel = mongoose.model("products", products);

@@ -1,55 +1,87 @@
 import jwt from "jsonwebtoken";
+import mongoose from "mongoose";
 import moment from "moment-timezone";
+
 import { UsersModel } from "../../models/users/users.model.js";
-import { productsModel } from "../../models/products/products.model.js";
 import { OrdersModel } from "../../models/orders/orders.model.js";
+import { productsModel } from "../../models/products/products.model.js";
 
 function shuffleArray(array) {
     for (let i = array.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
-        [array[i], array[j]] = [array[j], array[i]]; // Swap elements
+        [array[i], array[j]] = [array[j], array[i]];
     }
 }
 
 export default {
     async create(req, res) {
         try {
-            const SECRET_KEY = process.env.SECRET_KEY;
-            const images = req.files['images']?.map(file => `/uploads/products/${file.filename}`) || [];
+            // category maydonini to'g'ri formatda olish
+            // const categories = req.body.category.map(categoryId => mongoose.Types.ObjectId(categoryId));
 
-            if (!images.length) {
+            // shortDescription va description maydonlarini tekshirish
+            const { name, shortDescription, description, metaTitle, metaDescription, variants, category } = req.body;
+
+            if (shortDescription.length < 300) {
                 return res.status(400).json({
-                    msg: 'Images must not be empty',
+                    msg: 'Short description must be at least 300 characters.',
                     status: 400
                 });
             }
 
+            if (description.length < 300) {
+                return res.status(400).json({
+                    msg: 'Description must be at least 300 characters.',
+                    status: 400
+                });
+            }
 
+            // Variantsni to'g'ri formatda ishlash
+            const variantImages = req.files['variants[1][images]']?.map(file => `/uploads/products/${file.filename}`) || [];
+
+            // Asosiy rasmni olish
             const mainImage = req.files['mainImage']?.[0]
                 ? `/uploads/products/${req.files['mainImage'][0].filename}`
                 : null;
 
             if (!mainImage) {
                 return res.status(400).json({
-                    msg: 'mainImage must not be empty!',
+                    msg: 'Main image is required!',
                     status: 400
                 });
             }
 
-            const tokenHeader = req.headers['authorization'];
-            const token = tokenHeader.split(' ')[1];
-            const payload = jwt.verify(token, SECRET_KEY)
+            // Variantlarni to'g'ri formatda saqlash
+            const processedVariants = variants.map((variant, index) => {
+                if (index === 1) {
+                    return {
+                        ...variant,
+                        productImages: variantImages, // Variantga rasm qo'shish
+                    };
+                }
+                return variant;
+            });
 
-            let { name, short_description, description, stock_quantity, price, discount, sale_status, tags, category, color } = req.body;
+            // Yangi mahsulotni yaratish
+            const createdData = await productsModel.create({
+                name,
+                shortDescription,
+                description,
+                category: category,
+                metaTitle,
+                metaDescription,
+                variants: processedVariants, // Variantlarni saqlash
+                mainImg: mainImage,
+                userId: req.admin._id,
+                createdAt: moment.tz('Asia/Tashkent').toDate()
+            });
 
-            let createdData = await productsModel.create({
-                name, shortDescription: short_description, description, stockQuantity: stock_quantity, price, discount, saleStatus: sale_status, tags, category,
-                userId: payload.id, createdAt: moment.tz('Asia/Tashkent').toDate(), productImages: images, mainImg: mainImage, color
-            })
+            // Mahsulot yaratildi
+            res.status(201).json({ createdData, status: 201 });
 
-            res.status(201).json({ createdData, status: 201 })
         } catch (error) {
-            console.log(error.message)
+            console.log(error);
+            res.status(500).json({ msg: 'Error creating product', error: error.message });
         }
     },
 
@@ -81,6 +113,33 @@ export default {
         } catch (error) {
             console.log(error.message);
             res.status(500).json({ success: false, message: "Server error" });
+        }
+    },
+
+    async getVariantById(req, res) {
+        const { id } = req.params; // URL dan variantId olish
+
+        try {
+            // Variantni qidirish
+            const product = await productsModel.findOne({
+                "variants._id": id // `variants` ichida `_id`ni qidirish
+            });
+
+            if (!product) {
+                return res.status(404).json({ msg: 'Product with the specified variant not found' });
+            }
+
+            // Variantni olish
+            const variant = product.variants.find(v => v._id.toString() === id);
+
+            if (!variant) {
+                return res.status(404).json({ msg: 'Variant not found' });
+            }
+
+            res.status(200).json({ variant, status: 200 });
+        } catch (error) {
+            console.error('Error:', error.message);
+            res.status(500).json({ msg: 'Error occurred while fetching variant', error: error.message });
         }
     },
 
@@ -124,30 +183,30 @@ export default {
         }
     },
 
-    async getMyLike(req, res) {
-        try {
-            const SECRET_KEY = process.env.SECRET_KEY;
-            const tokenHeader = req.headers['authorization'];
-            const token = tokenHeader.split(' ')[1];
-            const payload = jwt.verify(token, SECRET_KEY)
+    // async getMyLike(req, res) {
+    //     try {
+    //         const SECRET_KEY = process.env.SECRET_KEY;
+    //         const tokenHeader = req.headers['authorization'];
+    //         const token = tokenHeader.split(' ')[1];
+    //         const payload = jwt.verify(token, SECRET_KEY)
 
 
-            let userData = await UsersModel.findOne({ _id: payload.id })
+    //         let userData = await UsersModel.findOne({ _id: payload.id })
 
-            if (!userData.interests.length) {
-                let products = await productsModel.find({ saleStatus: true }).sort({ viewsCount: -1 })
-                return res.status(200).json({ products, status: 200 })
-            }
+    //         if (!userData.interests.length) {
+    //             let products = await productsModel.find({ saleStatus: true }).sort({ viewsCount: -1 })
+    //             return res.status(200).json({ products, status: 200 })
+    //         }
 
-            const products = await productsModel.find({
-                saleStatus: true, tags: { $in: userData.interests }
-            }).sort({ viewsCount: -1 }).populate("user_id", "-password -phoneNumber");
+    //         const products = await productsModel.find({
+    //             saleStatus: true, tags: { $in: userData.interests }
+    //         }).sort({ viewsCount: -1 }).populate("user_id", "-password -phoneNumber");
 
-            res.status(200).json({ products, status: 200 })
-        } catch (error) {
-            console.log(error.message)
-        }
-    }, //togirlash kerak bunga check token qoyiladi
+    //         res.status(200).json({ products, status: 200 })
+    //     } catch (error) {
+    //         console.log(error.message)
+    //     }
+    // }, 
 
     async getById(req, res) {
         try {
@@ -209,10 +268,7 @@ export default {
         try {
             const {
                 name = '',
-                saleStatus,
-                discount,
                 category,
-                tags,
             } = req.query;
 
             // Qidirish uchun dinamik so'rovni tuzish
@@ -223,20 +279,8 @@ export default {
                 query.name = { $regex: name, $options: 'i' }; // 'i' - case-insensitive
             }
 
-            if (saleStatus) {
-                query.saleStatus = saleStatus === 'true';
-            }
-
-            if (discount) {
-                query.discount = Number(discount);
-            }
-
             if (category) {
                 query.category = { $in: category.split(',').map(id => mongoose.Types.ObjectId(id)) };
-            }
-
-            if (tags) {
-                query.tags = { $in: tags.split(',').map(id => mongoose.Types.ObjectId(id)) };
             }
 
             const results = await productsModel.find(query);
@@ -266,16 +310,11 @@ export default {
 
     async updateById(req, res) {
         try {
-            console.log(req.body)
             const { id } = req.params; // URL parametri orqali product ID olish
             const allowedFields = [
                 "name",
-                "short_description",
+                "shortDescription",
                 "description",
-                "stock_quantity",
-                "saleStatus",
-                "discount",
-                "price",
             ]; // Yangilanadigan maydonlar
 
             // Request body-dan kelgan kalitlarni filtrlash
@@ -315,23 +354,62 @@ export default {
         }
     },
 
-    async getRandomDiscountedProducts(req, res) {
+    async updateVariantById(req, res) {
         try {
-            // Query for products with a discount greater than 0
-            const productsWithDiscount = await productsModel.find({ discount: { $gt: 0 } });
+            const { productId, variantId } = req.params;
+            const updateData = req.body;
 
-            if (productsWithDiscount.length === 0) {
-                return res.status(404).json({ message: 'No products with discount found.' });
+            // O'chirish kerak bo'lgan maydonlar
+            delete updateData.productImages; // productImages yangilanmaydi
+
+            // Mahsulotni topish
+            const product = await productsModel.findById(productId);
+            if (!product) {
+                return res.status(404).json({ message: 'Mahsulot topilmadi' });
             }
 
-            // Shuffle the array of products randomly
-            shuffleArray(productsWithDiscount);
+            // Variantni topish
+            const variantIndex = product.variants.findIndex(v => v._id.toString() === variantId);
+            if (variantIndex === -1) {
+                return res.status(404).json({ message: 'Variant topilmadi' });
+            }
 
-            // Send the shuffled products as the response
-            res.status(200).json({ productsWithDiscount, status: 200 });
+            // Yangilash
+            Object.keys(updateData).forEach(key => {
+                if (updateData[key] !== undefined) {
+                    product.variants[variantIndex][key] = updateData[key];
+                }
+            });
+
+            // Yangilangan mahsulotni saqlash
+            await product.save();
+
+            res.status(200).json({ message: 'Variant yangilandi', data: product.variants[variantIndex] });
+
+        } catch (error) {
+            console.error(error);
+            res.status(500).json({ message: 'Server xatosi', error });
+        }
+    },
+
+    async getRandomDiscountedVariants(req, res) {
+        try {
+            // Mahsulotlarni variantlarining chegirmalarini tekshirish
+            const productsWithDiscountedVariants = await productsModel.find({
+                "variants.discount": { $gt: 0 }
+            });
+
+            if (productsWithDiscountedVariants.length === 0) {
+                return res.status(404).json({ message: 'No variants with discount found.' });
+            }
+
+            // Tasodifiy aralash
+            shuffleArray(productsWithDiscountedVariants);
+
+            res.status(200).json({ productsWithDiscountedVariants, status: 200 });
         } catch (err) {
             console.error(err);
-            res.status(500).json({ message: 'An error occurred while fetching products.' });
+            res.status(500).json({ message: 'An error occurred while fetching discounted variants.' });
         }
     }
 }

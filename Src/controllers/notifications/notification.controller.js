@@ -25,19 +25,27 @@ export default {
 
     async getMyNotifications(req, res) {
         try {
-            const SECRET_KEY = process.env.SECRET_KEY;
-            const tokenHeader = req.headers['authorization'];
-            const token = tokenHeader.split(' ')[1];
-            const payload = jwt.verify(token, SECRET_KEY)
-
             const notifications = await notificationsModel.find({
                 $or: [
-                    { userId: payload.id }, // Notifications specifically for the user
+                    { userId: req.admin ? req.admin._id : req.user._id }, // Notifications specifically for the user
                     { forAllUsers: true } // Notifications that are for all users
                 ]
             }).sort({ createdAt: -1 });
 
-            res.status(200).json({ notifications, status: 200 })
+            const unseenNotifications = notifications.filter(notification => {
+                // If the notification is for all users and the user hasn't viewed it
+                if (notification.forAllUsers && !notification.views.includes(req.user._id)) {
+                    return true;
+                }
+                // If the notification is specific to the user and the user hasn't viewed it
+                if (notification.userId.toString() === req.user._id.toString() && !notification.views.includes(req.user._id)) {
+                    return true;
+                }
+                // Return false if the user has already viewed it
+                return false;
+            });
+
+            res.status(200).json({ notifications: unseenNotifications, status: 200 })
         } catch (error) {
             console.log(error)
         }
@@ -58,16 +66,26 @@ export default {
                 return res.status(404).json({ msg: "Data not found", status: 200 })
             }
 
-            let usersData = await UsersModel.findOne({ _id: payload.id })
-            let adminData = await AdminsModel.findOne({ _id: payload.id })
-
-            if (adminData || usersData.isWorker === true) {
+            if (req.user && notificationData.forAllUsers === true) {
+                if (!notificationData.views.include(req.user._id)) {
+                    notificationData.views.push(req.user._id);
+                    notificationData.viewsCount = notificationData.views.length;
+                    await notificationData.save();
+                }
                 return res.status(200).json({ notificationData, status: 200 })
             }
 
-            if (usersData._id.toString() === notificationData.userId) {
-                notificationData.readAt = moment.tz('Asia/Tashkent').toDate()
-                notificationData.save()
+
+            if (req.admin || req.user.isWorker === true) {
+                return res.status(200).json({ notificationData, status: 200 })
+            }
+
+            if (req.user._id.toString() === notificationData.userId) {
+                if (!notificationData.views.include(req.user._id)) {
+                    notificationData.views.push(req.user._id);
+                    notificationData.viewsCount = notificationData.views.length;
+                    await notificationData.save();
+                }
                 return res.status(200).json({ notificationData, status: 200 })
             }
 

@@ -32,6 +32,7 @@ export const checkUserToken = async (req, res, next) => {
             if (adminData.tokenVersion !== payload.version) {
                 return res.status(403).json({ msg: "invalide token", status: 403 });
             }
+            req.admin = adminData
             return next(); // Admin mavjud bo'lsa, keyingi middleware-ga o'tish
         }
 
@@ -39,6 +40,7 @@ export const checkUserToken = async (req, res, next) => {
             return res.status(403).json({ msg: "invalide token", status: 403 });
         }
 
+        req.user = userData
         next()
     } catch (error) {
         if (error instanceof jwt.JsonWebTokenError) {

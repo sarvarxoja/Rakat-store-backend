@@ -4,7 +4,6 @@ import { AdminsModel } from "../../models/admin/admin.model.js";
 export const checkAdminToken = async (req, res, next) => {
     try {
         const SECRET_KEY = process.env.SECRET_KEY;
-
         const tokenHeader = req.headers['authorization'];
 
         if (!tokenHeader) {
@@ -14,31 +13,26 @@ export const checkAdminToken = async (req, res, next) => {
         }
 
         const token = tokenHeader.split(' ')[1];
-        const payload = jwt.verify(token, SECRET_KEY)
-        console.log(payload)
+        const payload = jwt.verify(token, SECRET_KEY);
 
         if (!payload.id || !payload.version) {
-            return res.status(403).json({ msg: "invalide token", status: 403 });
+            return res.status(403).json({ msg: "Invalid token", status: 403 });
         }
 
-        let adminData = await AdminsModel.findOne({ _id: payload.id })
+        const adminData = await AdminsModel.findOne({ _id: payload.id });
 
-        if (!adminData) {
-            return res.status(403).json({ msg: "invalide token", status: 403 });
+        if (!adminData || adminData.isAdmin !== true || adminData.tokenVersion !== payload.version) {
+            return res.status(403).json({ msg: "Invalid token", status: 403 });
         }
 
-        if (adminData.isAdmin !== true) {
-            return res.status(403).json({ msg: "invalide token", status: 403 });
-        }
-
-        if (adminData.tokenVersion !== payload.version) {
-            return res.status(403).json({ msg: "invalide token", status: 403 });
-        }
-
-        next()
+        // Admin ma'lumotlarini req obyektiga qo'shish
+        req.admin = adminData;
+        next();
     } catch (error) {
         if (error instanceof jwt.JsonWebTokenError) {
-            return res.status(403).json({ msg: "invalide token", status: 403 });
+            return res.status(403).json({ msg: "Invalid token", status: 403 });
         }
+        console.error(error.message);
+        res.status(500).json({ msg: "Internal Server Error", status: 500 });
     }
-}
+};

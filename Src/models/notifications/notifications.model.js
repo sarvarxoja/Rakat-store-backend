@@ -24,15 +24,23 @@ const notifications = new Schema({
         default: null
     },
 
-    readAt: {
-        type: Date,
-        default: null
-    },
-
     createdAt: {
         type: Date,
         default: Date.now,
     },
+    
+    views: [
+        {
+            type: Schema.ObjectId, // ObjectId типи
+            ref: 'Users',
+        }
+    ],
+
+    viewsCount: {
+        type: Number,
+        default: 0
+    },
+
 });
 
 export const notificationsModel = mongoose.model("Notifications", notifications)

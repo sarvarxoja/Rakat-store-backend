@@ -1,27 +1,30 @@
 import multer from 'multer';
+import path from 'path';
 
-// Fayllarni joylash uchun papkani aniqlash
+// Fayllarni yuklash uchun sozlamalar
 const storage = multer.diskStorage({
-    destination: function (req, file, cb) {
-        cb(null, 'uploads/products'); // Fayllarni saqlash joyi
+    destination: (req, file, cb) => {
+        cb(null, 'uploads/products'); // Fayllar uploads papkasiga saqlanadi
     },
-    filename: function (req, file, cb) {
-        cb(null, Date.now() + '-' + file.originalname);
-    },
-});
-
-// Fayl turlarini cheklash
-const fileFilter = (req, file, cb) => {
-    if (file.mimetype.startsWith('image/')) {
-        cb(null, true);
-    } else {
-        cb(new Error('Faqat rasm yuklash mumkin!'), false);
+    filename: (req, file, cb) => {
+        cb(null, Date.now() + path.extname(file.originalname)); // Fayl nomi vaqt belgisini o'z ichiga oladi
     }
-};
-
-// Multer konfiguratsiyasi
-export const upload = multer({
-    storage: storage,
-    fileFilter: fileFilter,
-    limits: { fileSize: 5 * 1024 * 1024 }, // Maksimal hajmni 5MB qilib cheklash
 });
+
+const upload = multer({
+    storage,
+    limits: { fileSize: 10 * 1024 * 1024 }, // 10MB gacha bo'lgan fayllar
+    fileFilter: (req, file, cb) => {
+        const fileTypes = /jpeg|jpg|png|gif/;
+        const extname = fileTypes.test(path.extname(file.originalname).toLowerCase());
+        const mimetype = fileTypes.test(file.mimetype);
+
+        if (extname && mimetype) {
+            return cb(null, true);
+        } else {
+            cb(new Error('Faqat rasm fayllari yuklanishi mumkin.'));
+        }
+    }
+});
+
+export default upload;

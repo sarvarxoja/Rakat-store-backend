@@ -1,4 +1,3 @@
-import jwt from "jsonwebtoken";
 import moment from "moment-timezone";
 import { tagsModel } from "../../models/tags/tags.model.js";
 
@@ -7,14 +6,7 @@ export default {
     async createTag(req, res) {
         try {
             let { name } = req.body;
-
-            const SECRET_KEY = process.env.SECRET_KEY;
-
-            const tokenHeader = req.headers['authorization'];
-            const token = tokenHeader.split(' ')[1];
-            const payload = jwt.verify(token, SECRET_KEY)
-
-            let createdData = await tagsModel.create({ name: `#${name}`, createdAt: moment.tz('Asia/Tashkent').toDate(), userId: payload.id })
+            let createdData = await tagsModel.create({ name: `#${name}`, createdAt: moment.tz('Asia/Tashkent').toDate(), userId: req.admin._id })
 
             res.status(201).json({ createdData, status: 201 })
         } catch (error) {

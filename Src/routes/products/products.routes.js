@@ -1,68 +1,93 @@
 import { Router } from "express";
-import { upload } from "../../utils/multer.js";
+import upload from "../../utils/multer.js";
 import { checkAdminToken } from "../../tokens/admin_token/admin.token.js";
 import productsController from "../../controllers/products/products.controller.js";
-import { validateProductCreate, validateProductUpdate } from "../../middlewares/check_product/product.middleware.js";
-
-/**
- * @swagger
- * tags:
- *   name: Products
- *   description: Products bilan ishlash uchun endpointlar
- */
+import { validateProductUpdate } from "../../middlewares/check_product/product.middleware.js";
 
 /**
  * @swagger
  * /products/create:
  *   post:
- *     summary: Create a new product
- *     tags: [Products]
- *     description: Create a new product with necessary details, images, and descriptions.
+ *     summary: Mahsulot yaratish
+ *     description: Yangi mahsulot yaratish uchun ma'lumotlar kiritiladi.
+ *     tags:
+ *       - Products
  *     requestBody:
  *       required: true
  *       content:
  *         multipart/form-data:
  *           schema:
  *             type: object
+ *             required:
+ *               - name
+ *               - shortDescription
+ *               - description
+ *               - mainImage
+ *               - variants
  *             properties:
  *               name:
  *                 type: string
- *                 example: "New Product"
- *               short_description:
+ *                 example: "Mahsulot nomi"
+ *               shortDescription:
  *                 type: string
- *                 example: "A short description of the product."
+ *                 example: "Qisqacha tavsif (kamida 300 ta belgi)"
  *               description:
  *                 type: string
- *                 example: "A more detailed product description."
- *               stock_quantity:
- *                 type: number
- *                 example: 50
- *               price:
- *                 type: number
- *                 example: 1000
- *               discount:
- *                 type: number
- *                 example: 10
- *               sale_status:
- *                 type: boolean
- *                 example: true
- *               tags:
+ *                 example: "Batafsil tavsif (kamida 300 ta belgi)"
+ *               metaTitle:
  *                 type: string
- *                 example: "electronics, gadgets"
- *               category:
+ *                 example: "Meta Title"
+ *               metaDescription:
  *                 type: string
- *                 example: "1,2"
- *               images:
+ *                 example: "Meta Description"
+ *               mainImage:
+ *                 type: string
+ *                 format: binary
+ *                 description: "Asosiy rasm yuklash"
+ *               variants[1][images]:
  *                 type: array
  *                 items:
  *                   type: string
- *               mainImage:
+ *                   format: binary
+ *                 description: "Variant uchun rasmlar yuklash"
+ *               variants[1][price]:
+ *                 type: number
+ *                 example: 20000
+ *               variants[1][color]:
  *                 type: string
+ *                 example: "red"
+ *               variants[1][discount]:
+ *                 type: number
+ *                 example: 10
+ *               variants[1][stockQuantity]:
+ *                 type: number
+ *                 example: 100
+ *               variants[1][saleStatus]:
+ *                 type: boolean
+ *                 example: true
  *     responses:
  *       201:
- *         description: Product created successfully
+ *         description: Mahsulot muvaffaqiyatli yaratildi.
+ *         content:
+ *           application/json:
+ *             example:
+ *               createdData:
+ *                 id: "67694284ac5a42fc8202dccf"
+ *                 name: "Mahsulot nomi"
+ *                 mainImg: "/uploads/products/1734951556666.png"
+ *                 shortDescription: "Qisqacha tavsif..."
+ *                 description: "Batafsil tavsif..."
+ *                 variants:
+ *                   - color: "red"
+ *                     price: 20000
+ *                     discount: 10
+ *                     stockQuantity: 100
+ *                     saleStatus: true
+ *                     productImages: ["/uploads/products/1.png"]
  *       400:
- *         description: Invalid or missing images or mainImage
+ *         description: So‘rov noto‘g‘ri yoki kerakli maydonlar to‘ldirilmagan.
+ *       500:
+ *         description: Serverda xatolik yuz berdi.
  */
 
 export const products_router = Router();
@@ -71,8 +96,13 @@ export const products_router = Router();
 products_router.post(
     "/create",
     checkAdminToken,
-    upload.fields([{ name: "images" }, { name: "mainImage", maxCount: 1 }]),
-    validateProductCreate,
+    upload.fields([
+        { name: "mainImage", maxCount: 1 },  // Handle the main image
+        { name: "variants[1][images]", maxCount: 10 },
+        { name: "variants[2][images]", maxCount: 10 },
+        { name: "variants[3][images]", maxCount: 10 },
+        { name: "variants[4][images]", maxCount: 10 }  // Handle variant images (assuming maxCount is 10 for each variant)
+    ]),
     productsController.create
 );
 
@@ -283,7 +313,7 @@ products_router.get("/get/popular", productsController.getPopularProduct)
  *                   type: string
  *                   description: "Xatolik haqida xabar"
  */
-products_router.get("/get/discounted", productsController.getRandomDiscountedProducts)
+products_router.get("/get/discounted", productsController.getRandomDiscountedVariants)
 
 /**
  * @swagger
@@ -385,7 +415,99 @@ products_router.get("/get/discounted", productsController.getRandomDiscountedPro
  */
 products_router.get("/best/sellers", productsController.getMostSell)
 
+/**
+ * @swagger
+ * /products/{productId}/variants/{variantId}:
+ *   patch:
+ *     summary: Mahsulot variantlarini yangilash
+ *     tags: [Products]
+ *     parameters:
+ *       - in: path
+ *         name: productId
+ *         required: true
+ *         description: Mahsulot ID-si
+ *         schema:
+ *           type: string
+ *       - in: path
+ *         name: variantId
+ *         required: true
+ *         description: Variant ID-si
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               color:
+ *                 type: string
+ *                 example: "Ko'k"
+ *               price:
+ *                 type: number
+ *                 example: 120000
+ *               discount:
+ *                 type: number
+ *                 example: 15
+ *               saleStatus:
+ *                 type: boolean
+ *                 example: true
+ *               stockQuantity:
+ *                 type: number
+ *                 example: 50
+ *     responses:
+ *       200:
+ *         description: Variant muvaffaqiyatli yangilandi
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                 data:
+ *                   type: object
+ *       404:
+ *         description: Mahsulot yoki variant topilmadi
+ *       500:
+ *         description: Server xatosi
+ */
 
+products_router.patch('/products/:productId/variants/:variantId', checkAdminToken, productsController.updateVariantById)
+
+/**
+ * @swagger
+ * /products/get/veriant/by/{id}:
+ *   get:
+ *     summary: Berilgan ID bo'yicha variantni olish
+ *     tags: [Products]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         description: Variant ID-si
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Variant muvaffaqiyatli topildi
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 variant:
+ *                   type: object
+ *                 status:
+ *                   type: number
+ *       404:
+ *         description: Variant topilmadi
+ *       500:
+ *         description: Server xatosi
+ */
+
+products_router.get("/get/veriant/by/:id", productsController.getVariantById)
 
 /**
 //  @swagger

@@ -4,9 +4,9 @@ import { UsersModel } from "../../models/users/users.model.js";
 // General validation uchun middleware
 export const validateUserMiddleware = async (req, res, next) => {
     try {
-        const { phone_number, firstName, lastName, password } = req.body;
+        const { phone_number, firstName, lastName, password, gender} = req.body;
 
-        if (!phone_number || !firstName || !lastName || !password) {
+        if (!phone_number || !firstName || !lastName || !password || !gender) {
             return res.status(400).json({ mssage: "Data is not fully", status: 400 })
         }
 

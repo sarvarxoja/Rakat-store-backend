@@ -10,7 +10,7 @@ import { comparePassword, encodePassword, jwtRefreshSign, jwtSign } from "../../
 export default {
     async register(req, res) {
         try {
-            let { phone_number, firstName, lastName, password } = req.body;
+            let { phone_number, firstName, lastName, password, gender } = req.body;
 
             // const code = Math.floor(1000 + Math.random() * 9000).toString();
             // password = await encodePassword(password);
@@ -43,12 +43,12 @@ export default {
             //     .catch((error) => console.error(error));
 
 
-            password = encodePassword(password)
+            password = await encodePassword(password)
             let code = "5555"
-            await redisClient.set(code, JSON.stringify({ phone_number, firstName, lastName, password }));
+            await redisClient.set(code, JSON.stringify({ phone_number, firstName, lastName, password, gender }));
 
 
-            // const createdData = await UsersModel.create({ phoneNumber: phone_number, firstName, lastName, password })
+            // const createdData = await UsersModel.create({ phoneNumber: phone_number, firstName, lastName, password, gender })
 
             res.status(201).json({
                 msg: "A code has been sent to your phone number for verification", status: 201
